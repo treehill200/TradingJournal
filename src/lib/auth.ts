@@ -3,6 +3,11 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { all, one, run, nowIso } from "./db";
 import { newId, sha256 } from "./ids";
+import {
+  CODE_LENGTH, RECOVERY_CODE_COUNT, makeRecoveryCode, normalizeRecoveryCode,
+} from "./recovery-codes";
+
+export { RECOVERY_CODE_COUNT, normalizeRecoveryCode };
 
 const scrypt = promisify(scryptCb) as (
   password: string,
@@ -170,4 +175,81 @@ export async function findUserByEmail(email: string) {
 export async function userExists(): Promise<boolean> {
   const rows = await all<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
   return Number(rows[0]?.n ?? 0) > 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* recovery codes                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Replaces every existing code with a fresh set and returns them in plain text
+ * — the only time they are ever readable. Only their hashes are stored.
+ */
+export async function issueRecoveryCodes(userId: string): Promise<string[]> {
+  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, makeRecoveryCode);
+  await run(`DELETE FROM recovery_codes WHERE user_id = ?`, [userId]);
+  const ts = nowIso();
+  for (const code of codes) {
+    await run(
+      `INSERT INTO recovery_codes (id, user_id, code_hash, used_at, created_at)
+       VALUES (?, ?, ?, NULL, ?)`,
+      [newId("r_"), userId, await hashPassword(normalizeRecoveryCode(code)), ts],
+    );
+  }
+  return codes;
+}
+
+export async function countRecoveryCodes(userId: string): Promise<{ total: number; unused: number }> {
+  const rows = await all<{ total: number; unused: number }>(
+    `SELECT COUNT(*) AS total, SUM(CASE WHEN used_at IS NULL THEN 1 ELSE 0 END) AS unused
+       FROM recovery_codes WHERE user_id = ?`,
+    [userId],
+  );
+  return { total: Number(rows[0]?.total ?? 0), unused: Number(rows[0]?.unused ?? 0) };
+}
+
+/**
+ * Checks a code and burns it. Returns the user id on success.
+ *
+ * Every failure path does the same amount of work as a success, so neither the
+ * answer nor the timing says whether the email exists.
+ */
+export async function consumeRecoveryCode(email: string, code: string): Promise<string | null> {
+  const cleaned = normalizeRecoveryCode(code);
+  const user = await findUserByEmail(email);
+  if (!user || cleaned.length < CODE_LENGTH) {
+    await verifyAgainstDecoy(cleaned);
+    return null;
+  }
+
+  const rows = await all<{ id: string; code_hash: string }>(
+    `SELECT id, code_hash FROM recovery_codes WHERE user_id = ? AND used_at IS NULL`,
+    [user.id],
+  );
+  if (!rows.length) {
+    await verifyAgainstDecoy(cleaned);
+    return null;
+  }
+
+  for (const row of rows) {
+    if (await verifyPassword(cleaned, row.code_hash)) {
+      // Burn it before returning, so a replayed request cannot reuse it.
+      await run(`UPDATE recovery_codes SET used_at = ? WHERE id = ? AND used_at IS NULL`, [
+        nowIso(),
+        row.id,
+      ]);
+      return user.id;
+    }
+  }
+  return null;
+}
+
+/** Sets a new password and signs every existing session out. */
+export async function resetPassword(userId: string, password: string): Promise<void> {
+  await run(`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, [
+    await hashPassword(password),
+    nowIso(),
+    userId,
+  ]);
+  await run(`DELETE FROM sessions WHERE user_id = ?`, [userId]);
 }

@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Labeled } from "@/components/DayPanel";
-import { IconAlert, IconCheck, IconPlus, IconTrash } from "@/components/Icons";
+import { IconAlert, IconCheck, IconLock, IconPlus, IconTrash } from "@/components/Icons";
+import RecoveryCodes from "@/components/RecoveryCodes";
 import { currency } from "@/lib/format";
 import type { Account } from "@/lib/types";
 
@@ -372,6 +373,85 @@ export function DangerZone({ account }: { account: Account }) {
           </button>
         )}
       </div>
+      <Notice message={message} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+export function RecoveryCodeSettings({
+  email,
+  unused,
+  total,
+}: {
+  email: string;
+  unused: number;
+  total: number;
+}) {
+  const { busy, message, send } = useSaver();
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  if (codes) {
+    return (
+      <div className="space-y-4">
+        <RecoveryCodes codes={codes} email={email} />
+        <button className="btn" onClick={() => setCodes(null)}>
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
+        <IconLock width={16} height={16} className={unused > 0 ? "text-profit" : "text-warn"} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium">
+            {total === 0
+              ? "No recovery codes yet"
+              : `${unused} of ${total} code${total === 1 ? "" : "s"} unused`}
+          </div>
+          <div className="mt-0.5 text-[11.5px] leading-relaxed text-faint">
+            {total === 0
+              ? "Without a code, a forgotten password cannot be recovered. Generate a set now."
+              : "Each code signs you in once so you can set a new password. Generating a new set voids the old one."}
+          </div>
+        </div>
+        {!asking && (
+          <button className="btn" onClick={() => setAsking(true)}>
+            {total === 0 ? "Generate codes" : "Generate new codes"}
+          </button>
+        )}
+      </div>
+
+      {asking && (
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface-2 p-3.5"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const password = new FormData(e.currentTarget).get("password");
+            const result = await send("/api/profile/recovery-codes", "POST", { password });
+            if (result?.recoveryCodes) {
+              setCodes(result.recoveryCodes as string[]);
+              setAsking(false);
+            }
+          }}
+        >
+          <label className="min-w-[220px] flex-1">
+            <span className="label">Confirm with your password</span>
+            <input name="password" type="password" className="input mt-1.5" required autoComplete="current-password" />
+          </label>
+          <button className="btn btn-primary" type="submit" disabled={busy}>
+            {busy ? "Generating…" : "Generate"}
+          </button>
+          <button type="button" className="btn" onClick={() => setAsking(false)}>
+            Cancel
+          </button>
+        </form>
+      )}
       <Notice message={message} />
     </div>
   );

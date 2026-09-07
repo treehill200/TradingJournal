@@ -1,4 +1,7 @@
-import { createSession, createUser, emailProblem, findUserByEmail, normalizeEmail, passwordProblem } from "@/lib/auth";
+import {
+  createSession, createUser, emailProblem, findUserByEmail, issueRecoveryCodes,
+  normalizeEmail, passwordProblem,
+} from "@/lib/auth";
 import { clientKey, fail, guard, json, readJson, str, throttle } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -27,7 +30,12 @@ export async function POST(req: Request) {
     }
 
     const user = await createUser(email, password, str(body.name));
+    const recoveryCodes = await issueRecoveryCodes(user.id);
     await createSession(user.id, req.headers.get("user-agent") ?? "");
-    return json({ ok: true, user: { id: user.id, email: user.email, name: user.name } });
+    return json({
+      ok: true,
+      user: { id: user.id, email: user.email, name: user.name },
+      recoveryCodes,
+    });
   });
 }

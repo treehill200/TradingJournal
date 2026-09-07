@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { countRecoveryCodes, getUser } from "@/lib/auth";
 import { activeAccountId } from "@/lib/active-account";
 import { loadWorkspace } from "@/lib/store";
 import { accountBalance, netCashFlow } from "@/lib/metrics";
 import { currency } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
-import { AccountList, AccountSettings, DangerZone, ProfileSettings } from "@/components/SettingsForms";
+import {
+  AccountList, AccountSettings, DangerZone, ProfileSettings, RecoveryCodeSettings,
+} from "@/components/SettingsForms";
 import ExportLinks from "@/components/ExportLinks";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -22,6 +24,7 @@ export default async function SettingsPage() {
     await activeAccountId(),
   );
   const balance = accountBalance(account, trades, dayEntries, events);
+  const recovery = await countRecoveryCodes(user.id);
 
   return (
     <>
@@ -58,6 +61,13 @@ export default async function SettingsPage() {
 
         <Section title="Profile" description="Your sign-in details. Only you can see any of this journal.">
           <ProfileSettings name={user.name} email={user.email} />
+        </Section>
+
+        <Section
+          title="Recovery codes"
+          description="The only way back in if you forget your password — this app sends no reset emails."
+        >
+          <RecoveryCodeSettings email={user.email} unused={recovery.unused} total={recovery.total} />
         </Section>
 
         <Section title="Danger zone" description="Irreversible actions. Export first if you might want the data back.">

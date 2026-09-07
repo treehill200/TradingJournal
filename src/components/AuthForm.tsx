@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconAlert, Logo } from "@/components/Icons";
+import RecoveryCodes from "@/components/RecoveryCodes";
 
 export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const isRegister = mode === "register";
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{ codes: string[]; email: string } | null>(null);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,12 +30,44 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
         setPending(false);
         return;
       }
+      // A new account gets its recovery codes once, before it goes anywhere.
+      if (isRegister && Array.isArray(body.recoveryCodes) && body.recoveryCodes.length) {
+        setIssued({ codes: body.recoveryCodes, email: String(data.email ?? "") });
+        setPending(false);
+        return;
+      }
       router.replace("/");
       router.refresh();
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
       setPending(false);
     }
+  }
+
+  if (issued) {
+    return (
+      <div>
+        <div className="mb-8 flex items-center gap-3 lg:hidden">
+          <Logo size={36} />
+          <div className="text-[15px] font-semibold tracking-tight">Trading Journal</div>
+        </div>
+        <h2 className="text-2xl font-semibold tracking-tight">Your recovery codes</h2>
+        <p className="mt-2 text-sm text-muted">
+          Your journal is ready. Take these with you first.
+        </p>
+        <div className="mt-7">
+          <RecoveryCodes
+            codes={issued.codes}
+            email={issued.email}
+            onDone={() => {
+              router.replace("/");
+              router.refresh();
+            }}
+            doneLabel="I've saved them — open my journal"
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -101,6 +135,15 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
           {isRegister ? "Sign in" : "Create an account"}
         </Link>
       </p>
+
+      {!isRegister && (
+        <p className="mt-2 text-center text-[12.5px] text-faint">
+          Forgot your password?{" "}
+          <Link className="link" href="/forgot">
+            Use a recovery code
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

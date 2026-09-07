@@ -67,6 +67,7 @@ and duplicate counts, all before anything is written.</sub>
 - CSV export of trades, daily summaries, journal entries and balance history
 - Manual entry: add individual trades, or log a whole day's totals at once
 - Multiple trading accounts (paper / live / backtest) kept completely apart
+- Recovery codes, so a forgotten password does not mean a lost journal
 - Account settings: currency, starting balance, and the risk per trade that
   defines 1R
 
@@ -111,6 +112,8 @@ where a quiet mistake would corrupt your numbers rather than crash the app:
 - **`metrics`** — day rollups, win rate excluding breakeven trades, R
   precedence, profit factor, drawdown, streaks, the equity curve, and the
   filters
+- **`recovery-codes`** — code shape, entropy, the exclusion of characters that
+  are misread on paper, and tolerance of however a person retypes them
 
 Two bugs were caught by writing them: a weekday-stripper that ate three-letter
 month names, so `Sep 14, 2026` failed to parse at all; and a journal note on a
@@ -186,12 +189,28 @@ Deploy behind HTTPS. Session cookies are set `Secure` automatically when
 - You can export everything as CSV, clear a single account's data, or delete
   your entire journal — password-confirmed — from **Settings**.
 
+### Recovering a forgotten password
+
+This app sends no email, so it does not have — and does not want — mail
+credentials. Recovery works with **one-time codes** instead:
+
+- Eight codes are issued when you create your account and shown once. Settings
+  reports how many are left and can issue a fresh set, which voids the old one.
+- To get back in, go to **Forgot your password?** and give your email, any
+  unused code, and a new password. The code is spent, every existing session is
+  signed out, and a new set of codes is issued.
+- Codes are stored hashed, exactly like passwords, and are matched
+  case-insensitively however you retype the spacing.
+- A wrong code and an unknown email return the same message, and both do the
+  same amount of work, so neither answer nor timing reveals who has an account.
+
+Treat the codes like passwords: anyone holding one plus your email can take
+over the account. If you lose your password *and* your codes, nothing in the
+app can let you back in — only whoever runs the instance can, by resetting the
+password directly in the database.
+
 ### Known limitations
 
-- **There is no password reset.** Sending a reset link needs mail credentials
-  this app deliberately does not ask for, and a half-working reset flow is
-  worse than none. If you lock yourself out, the account has to be recovered
-  directly in the database. Worth adding before opening sign-ups to strangers.
 - **Rate limiting is per instance**, held in memory. Behind several replicas
   each one counts separately, and the counters reset on deploy.
 - A whole account's trades are loaded per request. That is comfortable into
@@ -241,7 +260,7 @@ src/
   components/          calendar, day drawer, import wizard, charts, forms
   lib/
     db.ts              libSQL client + schema migration
-    auth.ts            scrypt hashing, sessions, registration
+    auth.ts            scrypt hashing, sessions, registration, recovery
     csv.ts             delimiter sniffing, RFC4180 parsing, loose number
                        and date parsing for real broker exports
     tradingview.ts     column mapping, layout detection, FIFO matching
