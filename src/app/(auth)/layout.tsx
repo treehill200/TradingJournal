@@ -46,8 +46,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </div>
 
         <div className="relative max-w-lg">
-          <h1 className="text-[40px] font-semibold leading-[1.08] tracking-tight">
-            Know exactly which days
+          <h1 className="text-balance text-[40px] font-semibold leading-[1.08] tracking-tight">
+            Know which days
             <span className="block bg-gradient-to-r from-brand to-profit bg-clip-text text-transparent">
               actually make you money.
             </span>
