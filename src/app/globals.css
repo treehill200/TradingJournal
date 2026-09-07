@@ -1,0 +1,278 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #05070c;
+  --color-surface: #0b0f17;
+  --color-surface-2: #10151f;
+  --color-surface-3: #161c28;
+  --color-line: #1c2331;
+  --color-line-soft: #151b26;
+  --color-ink: #e8ecf5;
+  --color-muted: #8d97ab;
+  --color-faint: #5c667a;
+  --color-brand: #6d8dff;
+  --color-brand-dim: #3d55b8;
+  --color-profit: #34d399;
+  --color-profit-dim: #10493a;
+  --color-loss: #fb7185;
+  --color-loss-dim: #4d1f2e;
+  --color-warn: #fbbf24;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Menlo", "Consolas", monospace;
+
+  --radius-card: 14px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  /* A very soft aurora behind the whole app so flat panels feel lit. */
+  background-image:
+    radial-gradient(900px 520px at 12% -10%, rgba(109, 141, 255, 0.13), transparent 60%),
+    radial-gradient(760px 460px at 92% 0%, rgba(52, 211, 153, 0.07), transparent 62%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+::selection {
+  background: rgba(109, 141, 255, 0.32);
+}
+
+/* scrollbars ------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #212939;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2c364a;
+  background-clip: content-box;
+}
+
+@layer components {
+  .card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0)) ,
+      var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.035) inset,
+      0 18px 40px -28px rgba(0, 0, 0, 0.9);
+  }
+
+  .card-hover {
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+  .card-hover:hover {
+    border-color: #29344a;
+    transform: translateY(-1px);
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 140ms ease, border-color 140ms ease, opacity 140ms ease;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--color-surface-3);
+    border-color: #2b3549;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #7793ff, #5570e8);
+    border-color: #6b86f5;
+    color: #060a15;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #8aa2ff, #6a83ef);
+    border-color: #7f97ff;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-muted);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+  }
+
+  .btn-danger {
+    background: rgba(251, 113, 133, 0.1);
+    border-color: rgba(251, 113, 133, 0.32);
+    color: #ffa9b8;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(251, 113, 133, 0.18);
+  }
+
+  .input {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: #080c13;
+    border: 1px solid var(--color-line);
+    color: var(--color-ink);
+    font-size: 14px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+  }
+  .input:focus {
+    outline: none;
+    border-color: #4a63c9;
+    box-shadow: 0 0 0 3px rgba(109, 141, 255, 0.14);
+  }
+  .input::placeholder {
+    color: #4d5768;
+  }
+  textarea.input {
+    height: auto;
+    padding: 10px 12px;
+    line-height: 1.6;
+    resize: vertical;
+  }
+  select.input {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #7b859a 50%),
+      linear-gradient(135deg, #7b859a 50%, transparent 50%);
+    background-position: calc(100% - 17px) 17px, calc(100% - 12px) 17px;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 32px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface-2);
+    color: var(--color-muted);
+  }
+
+  .segment {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 10px;
+    background: #080c13;
+    border: 1px solid var(--color-line);
+  }
+  .segment > button {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--color-faint);
+    transition: color 130ms ease, background 130ms ease;
+    cursor: pointer;
+  }
+  .segment > button:hover {
+    color: var(--color-ink);
+  }
+  .segment > button[data-active="true"] {
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  }
+
+  .link {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade {
+  animation: fade 180ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
