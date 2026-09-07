@@ -292,6 +292,22 @@ export function detectDayFirst(values: string[]): boolean {
   return false;
 }
 
+/**
+ * True when every numeric date in the column could be read either way —
+ * "04/09/2026" is 4 September or 9 April and the file cannot tell you which.
+ */
+export function datesAreAmbiguous(values: string[]): string | null {
+  let candidate: string | null = null;
+  for (const v of values) {
+    const raw = String(v).trim();
+    const m = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+    if (!m) continue;
+    if (+m[1] > 12 || +m[2] > 12) return null; // something in the column settles it
+    if (+m[1] !== +m[2] && !candidate) candidate = m[0];
+  }
+  return candidate;
+}
+
 /* ------------------------------------------------------------------ */
 /* writing                                                             */
 /* ------------------------------------------------------------------ */

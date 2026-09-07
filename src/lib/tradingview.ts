@@ -17,7 +17,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { detectDayFirst, normalizeHeader, parseDateTime, parseNumber, type Table } from "./csv";
+import { datesAreAmbiguous, detectDayFirst, normalizeHeader, parseDateTime, parseNumber, type Table } from "./csv";
 
 export type Dataset = "trades" | "balance";
 export type TradeMode = "closed" | "paired" | "fills";
@@ -635,6 +635,7 @@ export function analyze(
   const dayFirst =
     options.dayFirst ?? detectDayFirst(sample(table, dateColumn, 200));
 
+  const ambiguous = datesAreAmbiguous(sample(table, dateColumn, 200));
   const dataset = options.dataset ?? detectDataset(table, mapping);
   const mode = dataset === "trades" ? options.mode ?? detectMode(table, mapping) : "closed";
 
@@ -682,6 +683,13 @@ export function analyze(
     events,
     skipped: result.skipped,
     openPositions: result.openPositions,
-    warnings: result.warnings,
+    warnings: ambiguous
+      ? [
+          `A date like "${ambiguous}" can be read either way. It is being read as ${
+            dayFirst ? "day/month" : "month/day"
+          } — switch the Dates setting if the closing dates look wrong.`,
+          ...result.warnings,
+        ]
+      : result.warnings,
   };
 }
