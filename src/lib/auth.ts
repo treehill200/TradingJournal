@@ -30,6 +30,19 @@ export async function hashPassword(password: string): Promise<string> {
   return `scrypt$${salt.toString("hex")}$${key.toString("hex")}`;
 }
 
+/**
+ * A real scrypt hash used when the email is unknown, so a failed sign-in costs
+ * the same either way. Without it, response time alone tells an attacker which
+ * addresses have accounts.
+ */
+let decoyHash: Promise<string> | null = null;
+
+export async function verifyAgainstDecoy(password: string): Promise<false> {
+  if (!decoyHash) decoyHash = hashPassword("decoy-password-never-matches");
+  await verifyPassword(password, await decoyHash);
+  return false;
+}
+
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [scheme, saltHex, keyHex] = stored.split("$");
   if (scheme !== "scrypt" || !saltHex || !keyHex) return false;
@@ -61,7 +74,15 @@ export function emailProblem(email: string): string | null {
 /* sessions                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Clears sessions that have already expired. Cheap, and keeps the table tidy. */
+export async function pruneExpiredSessions(): Promise<void> {
+  await run(`DELETE FROM sessions WHERE expires_at < ?`, [nowIso()]);
+}
+
 export async function createSession(userId: string, userAgent = ""): Promise<void> {
+  // Signing in is a natural, infrequent moment to take out the rubbish.
+  await pruneExpiredSessions().catch(() => {});
+
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_DAYS * 864e5);
   await run(

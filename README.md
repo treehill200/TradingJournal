@@ -170,14 +170,33 @@ Deploy behind HTTPS. Session cookies are set `Secure` automatically when
   never stored or logged in any recoverable form.
 - Sessions are random 256-bit tokens stored **hashed** in the database, handed
   out in `HttpOnly`, `SameSite=Lax` cookies, and expire after 30 days.
-  Changing your password invalidates every session.
+  Changing your password invalidates every session, and expired rows are
+  pruned on each sign-in.
 - **Every query is scoped by user id.** There is no endpoint that returns
   another user's trades, and signed-out requests to the API get a 401.
+- A failed sign-in costs the same whether or not the email exists — an unknown
+  address is still checked against a decoy hash — so response time cannot be
+  used to discover who has an account. Both cases return the same message.
 - Sign-in and sign-up are rate limited per IP.
+- Every response carries a **nonce-based Content Security Policy** (no blanket
+  inline script), plus `frame-ancestors 'none'`, `form-action 'self'`,
+  `nosniff`, a strict referrer policy and HSTS in production.
 - Only the sign-in and sign-up pages are indexable; the journal itself is
   excluded in `robots.txt`.
 - You can export everything as CSV, clear a single account's data, or delete
   your entire journal — password-confirmed — from **Settings**.
+
+### Known limitations
+
+- **There is no password reset.** Sending a reset link needs mail credentials
+  this app deliberately does not ask for, and a half-working reset flow is
+  worse than none. If you lock yourself out, the account has to be recovered
+  directly in the database. Worth adding before opening sign-ups to strangers.
+- **Rate limiting is per instance**, held in memory. Behind several replicas
+  each one counts separately, and the counters reset on deploy.
+- A whole account's trades are loaded per request. That is comfortable into
+  the tens of thousands of trades; well beyond that, the day rollups would
+  want to move into SQL.
 
 ---
 
@@ -228,6 +247,7 @@ src/
     tradingview.ts     column mapping, layout detection, FIFO matching
     import.ts          duplicate detection, writing, full refresh
     metrics.ts         day rollups, summary stats, equity curve, breakdowns
+  middleware.ts        security headers and the CSP nonce
 tests/               unit tests for csv, tradingview and metrics
 ```
 

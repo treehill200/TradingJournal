@@ -1,4 +1,6 @@
-import { createSession, findUserByEmail, normalizeEmail, verifyPassword } from "@/lib/auth";
+import {
+  createSession, findUserByEmail, normalizeEmail, verifyAgainstDecoy, verifyPassword,
+} from "@/lib/auth";
 import { clientKey, fail, guard, json, readJson, str, throttle } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -16,10 +18,14 @@ export async function POST(req: Request) {
     if (!email || !password) return fail("Email and password are required.");
 
     const user = await findUserByEmail(email);
-    // Same message either way so the form cannot be used to discover emails.
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
-      return fail("Incorrect email or password.", 401);
-    }
+
+    // Same message either way, and the same amount of work either way: an
+    // unknown email still pays for one scrypt, so response time reveals
+    // nothing about which addresses have accounts.
+    const ok = user
+      ? await verifyPassword(password, user.password_hash)
+      : await verifyAgainstDecoy(password);
+    if (!ok || !user) return fail("Incorrect email or password.", 401);
 
     await createSession(user.id, req.headers.get("user-agent") ?? "");
     return json({ ok: true, user: { id: user.id, email: user.email, name: user.name } });
