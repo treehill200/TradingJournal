@@ -6,7 +6,7 @@ import { loadWorkspace } from "@/lib/store";
 import { parseFilters } from "@/lib/filters";
 import {
   accountBalance, applyFilters, buildDayRollups, buildEquityCurve, bySymbol,
-  addDays, monthKey, startOfWeek, summarize, todayKey,
+  addDays, filterDayEntries, monthKey, startOfWeek, summarize, todayKey,
 } from "@/lib/metrics";
 import { currency, percent, shortDate } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
@@ -39,8 +39,9 @@ export default async function DashboardPage({
   );
 
   const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, dayEntries, notes);
-  const days = [...rollups.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const filteredEntries = filterDayEntries(dayEntries, filters);
+  const rollups = buildDayRollups(filtered, account, filteredEntries, notes);
+  const days = [...rollups.values()].filter((d) => d.activity).sort((a, b) => (a.date < b.date ? -1 : 1));
   const summary = summarize(filtered, account, days);
   const curve = buildEquityCurve(account, days, events);
   const balance = accountBalance(account, trades, dayEntries, events);

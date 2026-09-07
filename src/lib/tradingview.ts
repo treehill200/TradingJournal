@@ -575,6 +575,7 @@ function normalizeBalance(table: Table, mapping: Mapping, dayFirst: boolean) {
   let skipped = 0;
 
   let previousBalance: number | null = null;
+  let missingAmount = 0;
   for (const row of table.rows) {
     const when = pickTime(row, mapping, dayFirst, ["time", "closeTime", "openTime"]);
     if (!when) {
@@ -588,6 +589,10 @@ function normalizeBalance(table: Table, mapping: Mapping, dayFirst: boolean) {
     }
     if (balance !== null) previousBalance = balance;
     if (amount === null) {
+      // Happens on the first row of a file that only carries a running
+      // balance: with nothing before it, the movement is unknowable. Inventing
+      // one would fabricate a deposit the size of the whole account.
+      missingAmount++;
       skipped++;
       continue;
     }
@@ -610,6 +615,11 @@ function normalizeBalance(table: Table, mapping: Mapping, dayFirst: boolean) {
       note: cell(row, mapping.note) || label,
       raw: rawOf(table.headers, row),
     });
+  }
+  if (missingAmount) {
+    warnings.push(
+      `${missingAmount} row(s) had no amount and no earlier balance to compare against, so the movement could not be worked out. Import a file with an amount column to include them.`,
+    );
   }
   return { events, skipped, warnings, openPositions: 0 };
 }

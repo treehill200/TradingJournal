@@ -4,7 +4,7 @@ import { getUser } from "@/lib/auth";
 import { activeAccountId } from "@/lib/active-account";
 import { loadWorkspace } from "@/lib/store";
 import { parseFilters } from "@/lib/filters";
-import { applyFilters, buildDayRollups, byMonth, bySymbol, formatMonthLabel, summarize } from "@/lib/metrics";
+import { applyFilters, buildDayRollups, byMonth, bySymbol, filterDayEntries, formatMonthLabel, summarize } from "@/lib/metrics";
 import { currency, percent } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import FilterBar from "@/components/FilterBar";
@@ -27,8 +27,8 @@ export default async function ReportsPage({
   const ccy = account.currency;
 
   const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, dayEntries, notes);
-  const days = [...rollups.values()];
+  const rollups = buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes);
+  const days = [...rollups.values()].filter((d) => d.activity);
   const summary = summarize(filtered, account, days);
   const months = byMonth(days).reverse();
   const symbols = bySymbol(filtered);

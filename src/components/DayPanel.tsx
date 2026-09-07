@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconClose, IconPlus, IconTrash } from "@/components/Icons";
+import { IconClose, IconPencil, IconPlus, IconTrash } from "@/components/Icons";
 import { currency, longDate, percent, timeOfDay } from "@/lib/format";
 import type { DayEntry, DayNote, Trade } from "@/lib/types";
 
@@ -170,51 +170,7 @@ function TradesTab({
       )}
 
       {data.trades.map((trade) => (
-        <div key={trade.id} className="rounded-xl border border-line bg-surface-2 p-3">
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[13.5px] font-semibold">{trade.symbol}</span>
-                <span
-                  className={`chip h-5 px-1.5 text-[10px] ${
-                    trade.side === "long" ? "text-profit" : "text-loss"
-                  }`}
-                >
-                  {trade.side.toUpperCase()}
-                </span>
-                {trade.source !== "manual" && <span className="chip h-5 px-1.5 text-[10px]">CSV</span>}
-              </div>
-              <div className="num mt-1 text-[11.5px] text-faint">
-                {trade.quantity} @ {trade.entry_price ?? "—"} → {trade.exit_price ?? "—"} ·{" "}
-                {timeOfDay(trade.opened_at)}–{timeOfDay(trade.closed_at)}
-              </div>
-              {trade.tags && <div className="mt-1.5 text-[11px] text-brand">{trade.tags}</div>}
-              {trade.notes && <div className="mt-1 text-[12px] text-muted">{trade.notes}</div>}
-            </div>
-            <div className="text-right">
-              <div
-                className={`num text-[14px] font-semibold ${trade.net_pnl >= 0 ? "text-profit" : "text-loss"}`}
-              >
-                {currency(trade.net_pnl, ccy, { sign: true })}
-              </div>
-              {trade.fees > 0 && (
-                <div className="num mt-0.5 text-[11px] text-faint">{currency(trade.fees, ccy)} fees</div>
-              )}
-              <button
-                className="btn-ghost mt-1.5 grid h-7 w-7 place-items-center rounded-md text-faint hover:text-loss"
-                disabled={busy}
-                onClick={() => {
-                  if (confirm(`Delete this ${trade.symbol} trade? This cannot be undone.`)) {
-                    send(`/api/trades/${trade.id}`, "DELETE");
-                  }
-                }}
-                aria-label="Delete trade"
-              >
-                <IconTrash width={14} height={14} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <TradeRow key={trade.id} trade={trade} ccy={ccy} busy={busy} send={send} />
       ))}
 
       {adding ? (
@@ -230,6 +186,149 @@ function TradesTab({
         <button className="btn w-full" onClick={() => setAdding(true)}>
           <IconPlus width={15} height={15} /> Add a trade
         </button>
+      )}
+    </div>
+  );
+}
+
+function TradeRow({
+  trade,
+  ccy,
+  busy,
+  send,
+}: {
+  trade: Trade;
+  ccy: string;
+  busy: boolean;
+  send: (url: string, method: string, body?: unknown) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 p-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[13.5px] font-semibold">{trade.symbol}</span>
+            <span
+              className={`chip h-5 px-1.5 text-[10px] ${
+                trade.side === "long" ? "text-profit" : "text-loss"
+              }`}
+            >
+              {trade.side.toUpperCase()}
+            </span>
+            {trade.source !== "manual" && <span className="chip h-5 px-1.5 text-[10px]">CSV</span>}
+          </div>
+          <div className="num mt-1 text-[11.5px] text-faint">
+            {trade.quantity} @ {trade.entry_price ?? "—"} → {trade.exit_price ?? "—"} ·{" "}
+            {timeOfDay(trade.opened_at)}–{timeOfDay(trade.closed_at)}
+          </div>
+          {!editing && trade.tags && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {trade.tags
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
+                .map((tag) => (
+                  <span key={tag} className="chip h-5 px-2 text-[10px] text-brand">
+                    {tag}
+                  </span>
+                ))}
+            </div>
+          )}
+          {!editing && trade.notes && (
+            <div className="mt-1.5 whitespace-pre-line text-[12px] leading-relaxed text-muted">
+              {trade.notes}
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 text-right">
+          <div className={`num text-[14px] font-semibold ${trade.net_pnl >= 0 ? "text-profit" : "text-loss"}`}>
+            {currency(trade.net_pnl, ccy, { sign: true })}
+          </div>
+          {trade.fees > 0 && (
+            <div className="num mt-0.5 text-[11px] text-faint">{currency(trade.fees, ccy)} fees</div>
+          )}
+          <div className="mt-1.5 flex justify-end gap-1">
+            <button
+              className={`btn-ghost grid h-7 w-7 place-items-center rounded-md ${
+                editing ? "text-brand" : "text-faint hover:text-ink"
+              }`}
+              onClick={() => setEditing((v) => !v)}
+              aria-label={editing ? "Stop editing trade" : "Edit tags and notes"}
+              title="Tags and notes"
+            >
+              <IconPencil width={14} height={14} />
+            </button>
+            <button
+              className="btn-ghost grid h-7 w-7 place-items-center rounded-md text-faint hover:text-loss"
+              disabled={busy}
+              onClick={() => {
+                if (confirm(`Delete this ${trade.symbol} trade? This cannot be undone.`)) {
+                  send(`/api/trades/${trade.id}`, "DELETE");
+                }
+              }}
+              aria-label="Delete trade"
+            >
+              <IconTrash width={14} height={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {editing && (
+        <form
+          className="mt-3 space-y-2.5 border-t border-line pt-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const form = new FormData(e.currentTarget);
+            const ok = await send(`/api/trades/${trade.id}`, "PATCH", {
+              tags: form.get("tags"),
+              notes: form.get("notes"),
+              rMultiple: form.get("rMultiple"),
+            });
+            if (ok) setEditing(false);
+          }}
+        >
+          <Labeled label="Tags" hint="comma separated — these drive the filters and the tag breakdown">
+            <input
+              name="tags"
+              className="input h-9"
+              defaultValue={trade.tags}
+              placeholder="breakout, A+ setup"
+              maxLength={200}
+              autoFocus
+            />
+          </Labeled>
+          <Labeled label="Notes">
+            <textarea
+              name="notes"
+              className="input"
+              rows={2}
+              defaultValue={trade.notes}
+              placeholder="Why you took it, and how it went."
+              maxLength={2000}
+            />
+          </Labeled>
+          <Labeled label="R override" hint="leave blank to use the account's risk setting">
+            <input
+              name="rMultiple"
+              type="number"
+              step="any"
+              className="input num h-9"
+              defaultValue={trade.r_multiple ?? ""}
+            />
+          </Labeled>
+          <div className="flex gap-2">
+            <button type="submit" className="btn btn-primary h-8 text-[12px]" disabled={busy}>
+              Save
+            </button>
+            <button type="button" className="btn h-8 text-[12px]" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );

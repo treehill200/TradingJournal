@@ -6,7 +6,7 @@ import { loadWorkspace } from "@/lib/store";
 import { parseFilters } from "@/lib/filters";
 import {
   applyFilters, buildDayRollups, buildEquityCurve, byHour, byMonth, bySide, bySymbol,
-  byTag, byWeekday, summarize, tradeR,
+  byTag, byWeekday, filterDayEntries, summarize, tradeR,
 } from "@/lib/metrics";
 import { currency, number, percent, shortDate } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
@@ -34,8 +34,8 @@ export default async function StatisticsPage({
   );
   const ccy = account.currency;
   const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, dayEntries, notes);
-  const days = [...rollups.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const rollups = buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes);
+  const days = [...rollups.values()].filter((d) => d.activity).sort((a, b) => (a.date < b.date ? -1 : 1));
   const summary = summarize(filtered, account, days);
   const curve = buildEquityCurve(account, days, events);
 
@@ -71,7 +71,7 @@ export default async function StatisticsPage({
     <>
       <PageHeader
         title="Statistics"
-        subtitle={`${summary.trades} trades over ${summary.tradingDays} trading days`}
+        subtitle={`${summary.trades} trade${summary.trades === 1 ? "" : "s"} over ${summary.tradingDays} trading day${summary.tradingDays === 1 ? "" : "s"}`}
       />
 
       <div className="space-y-4 px-4 py-5 sm:px-6">

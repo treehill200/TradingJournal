@@ -205,7 +205,8 @@ export function parseDateTime(
     );
   }
 
-  s = s.replace(/^[a-z]{3},?\s+/i, ""); // leading weekday
+  // Only real weekday names — a bare /^[a-z]{3}/ would eat "May 13, 2024".
+  s = s.replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+/i, "");
   const trailingTz = /\s*(?:UTC|GMT|Z)\s*(?:[+-]\d{1,2}:?\d{2})?$/i;
   s = s.replace(trailingTz, "").trim();
   s = s.replace(/\s*[+-]\d{2}:\d{2}$/, "").trim(); // explicit offset
@@ -217,12 +218,35 @@ export function parseDateTime(
     s = s.slice(0, -ap[0].length).trim();
   }
 
-  const [datePart = "", timePartRaw = ""] = s.split(/[T\s]+/, 2).length > 1
-    ? [s.split(/[T\s]+/)[0], s.split(/[T\s]+/).slice(1).join(" ")]
-    : [s, ""];
+  const year4 = (raw: string) => (raw.length <= 2 ? 2000 + Number(raw) : Number(raw));
+  const monthOf = (name: string) => MONTHS[name.slice(0, 3).toLowerCase()];
+
+  // Written-month forms are pulled off first: the month name has no separator
+  // we could split the date from the time on.
+  let written: { y: number; mo: number; d: number } | null = null;
+  let timePart = "";
+
+  let m = s.match(/^([a-z]{3,})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4})\b/i);
+  if (m && monthOf(m[1])) {
+    written = { y: year4(m[3]), mo: monthOf(m[1]), d: +m[2] };
+    timePart = s.slice(m[0].length).trim();
+  } else {
+    m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?[-\s]([a-z]{3,})\.?[-\s](\d{2,4})\b/i);
+    if (m && monthOf(m[2])) {
+      written = { y: year4(m[3]), mo: monthOf(m[2]), d: +m[1] };
+      timePart = s.slice(m[0].length).trim();
+    }
+  }
+
+  let datePart = s;
+  if (!written) {
+    const pieces = s.split(/[T\s]+/);
+    datePart = pieces[0];
+    timePart = pieces.slice(1).join(" ");
+  }
 
   let hh = 0, mm = 0, ss = 0;
-  const timeMatch = timePartRaw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  const timeMatch = timePart.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (timeMatch) {
     hh = Number(timeMatch[1]);
     mm = Number(timeMatch[2]);
@@ -231,8 +255,10 @@ export function parseDateTime(
     if (ampm === "am" && hh === 12) hh = 0;
   }
 
+  if (written) return fromParts(written.y, written.mo, written.d, hh, mm, ss);
+
   // 2024-05-13
-  let m = datePart.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  m = datePart.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if (m) return fromParts(+m[1], +m[2], +m[3], hh, mm, ss);
 
   // 20240513
@@ -242,26 +268,14 @@ export function parseDateTime(
   // 13/05/2024 or 05/13/2024 (and 2-digit years)
   m = datePart.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (m) {
-    let a = +m[1];
-    let b = +m[2];
-    const year = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    const a = +m[1];
+    const b = +m[2];
     let day: number, month: number;
     if (a > 12) { day = a; month = b; }
     else if (b > 12) { month = a; day = b; }
     else if (opts.dayFirst) { day = a; month = b; }
     else { month = a; day = b; }
-    return fromParts(year, month, day, hh, mm, ss);
-  }
-
-  // 13 May 2024 / May 13, 2024 / 13-May-24
-  m = datePart.match(/^(\d{1,2})[-\s]([a-z]{3,})[-\s](\d{2,4})$/i);
-  if (m && MONTHS[m[2].slice(0, 3).toLowerCase()]) {
-    const year = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-    return fromParts(year, MONTHS[m[2].slice(0, 3).toLowerCase()], +m[1], hh, mm, ss);
-  }
-  m = s.match(/^([a-z]{3,})\s+(\d{1,2}),?\s+(\d{4})/i);
-  if (m && MONTHS[m[1].slice(0, 3).toLowerCase()]) {
-    return fromParts(+m[3], MONTHS[m[1].slice(0, 3).toLowerCase()], +m[2], hh, mm, ss);
+    return fromParts(year4(m[3]), month, day, hh, mm, ss);
   }
 
   const fallback = new Date(s);

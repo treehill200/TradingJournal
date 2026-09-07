@@ -57,6 +57,8 @@ and duplicate counts, all before anything is written.</sub>
 **Everything else**
 
 - Daily journal entries — headline, notes, mood, discipline rating, tags
+- Tags and notes on individual trades, editable inline — including on imported
+  ones, which is what makes the tag filter and the per-tag breakdown useful
 - Statistics: expectancy, profit factor, drawdown, streaks, R spread, and
   breakdowns by symbol, weekday, hour closed, direction, tag and month
 - Equity curve and drawdown-from-peak charts
@@ -90,7 +92,29 @@ automatically at `data/journal.db`.
 ```bash
 npm run build && npm start     # production build
 npm run typecheck              # TypeScript, no emit
+npm test                       # unit tests
 ```
+
+### Tests
+
+`npm test` runs the suite with Node's built-in test runner. It covers the parts
+where a quiet mistake would corrupt your numbers rather than crash the app:
+
+- **`csv`** — delimiter sniffing, quoted fields, title rows before the header,
+  European decimals, parenthesised negatives, and every date shape brokers
+  emit, including the rule that a wall-clock time never shifts into another
+  timezone
+- **`tradingview`** — column mapping (a "Take Profit" column must never become
+  the P&L column; `Profit USD` must beat `Profit %`), detection of all three
+  trade layouts, FIFO matching including a partial fill split across two
+  entries, and dedupe keys staying stable when a later export appends rows
+- **`metrics`** — day rollups, win rate excluding breakeven trades, R
+  precedence, profit factor, drawdown, streaks, the equity curve, and the
+  filters
+
+Two bugs were caught by writing them: a weekday-stripper that ate three-letter
+month names, so `Sep 14, 2026` failed to parse at all; and a journal note on a
+day you did not trade counting as a trading day.
 
 ---
 
@@ -177,6 +201,12 @@ Deploy behind HTTPS. Session cookies are set `Secure` automatically when
   flows. Balance rows that merely restate trade P&L or commission are stored
   but excluded, so nothing is counted twice.
 - **Drawdown** is measured against the running high-water mark of that balance.
+- **A journal note is not a trading day.** Writing about a day you sat out
+  marks the day on the calendar but never enters the trading-day count, the
+  green-day rate or the equity curve.
+- **Manual day entries carry only a date and a total.** A date range narrows
+  them; a filter that asks about a symbol, side, tag or result excludes them,
+  because a whole-day entry has none of those attributes to match.
 
 ---
 
@@ -198,6 +228,7 @@ src/
     tradingview.ts     column mapping, layout detection, FIFO matching
     import.ts          duplicate detection, writing, full refresh
     metrics.ts         day rollups, summary stats, equity curve, breakdowns
+tests/               unit tests for csv, tradingview and metrics
 ```
 
 Charts are hand-drawn SVG and the icons are inline, so the only runtime

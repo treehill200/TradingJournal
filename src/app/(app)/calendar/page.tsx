@@ -4,7 +4,7 @@ import { getUser } from "@/lib/auth";
 import { activeAccountId } from "@/lib/active-account";
 import { loadWorkspace } from "@/lib/store";
 import { parseFilters } from "@/lib/filters";
-import { applyFilters, buildDayRollups, byMonth, summarize } from "@/lib/metrics";
+import { applyFilters, buildDayRollups, byMonth, filterDayEntries, summarize } from "@/lib/metrics";
 import { currency, percent } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import Calendar from "@/components/Calendar";
@@ -26,7 +26,7 @@ export default async function CalendarPage({
   const filters = parseFilters(await searchParams);
   const { account, trades, dayEntries, notes } = await loadWorkspace(user.id, await activeAccountId());
   const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, dayEntries, notes);
+  const rollups = buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes);
   const days = [...rollups.values()];
   const summary = summarize(filtered, account, days);
   const months = byMonth(days);
@@ -40,7 +40,7 @@ export default async function CalendarPage({
     <>
       <PageHeader
         title="Calendar"
-        subtitle={`${summary.tradingDays} trading days · ${percent(summary.greenDayRate, 0)} green · ${currency(summary.netPnl, account.currency, { sign: true })} net`}
+        subtitle={`${summary.tradingDays} trading day${summary.tradingDays === 1 ? "" : "s"} · ${percent(summary.greenDayRate, 0)} green · ${currency(summary.netPnl, account.currency, { sign: true })} net`}
         actions={<AddDayButton ccy={account.currency} />}
       />
 

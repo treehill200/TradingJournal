@@ -41,7 +41,7 @@ export default function Calendar({
   const monthPrefix = cursor.slice(0, 7);
 
   const monthDays = useMemo(
-    () => Object.values(days).filter((d) => d.date.startsWith(monthPrefix)),
+    () => Object.values(days).filter((d) => d.activity && d.date.startsWith(monthPrefix)),
     [days, monthPrefix],
   );
 
@@ -68,7 +68,7 @@ export default function Calendar({
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const listDays = useMemo(
-    () => Object.values(days).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    () => Object.values(days).filter((d) => d.activity).sort((a, b) => (a.date < b.date ? 1 : -1)),
     [days],
   );
 
@@ -148,7 +148,7 @@ export default function Calendar({
               const cells = grid.slice(week * 7, week * 7 + 7);
               const weekTotal = cells.reduce((s, key) => s + (days[key]?.netPnl ?? 0), 0);
               const weekTrades = cells.reduce((s, key) => s + (days[key]?.trades ?? 0), 0);
-              const active = cells.filter((key) => days[key]);
+              const active = cells.filter((key) => days[key]?.activity);
               if (week === 5 && !cells.some((key) => key.startsWith(monthPrefix))) return null;
 
               return (
@@ -199,7 +199,7 @@ export default function Calendar({
                 key={key}
                 onClick={() => setSelected(key)}
                 className="card card-hover min-h-[128px] p-3 text-left"
-                style={{ background: day ? heatBackground(day.netPnl, maxAbs) : undefined }}
+                style={{ background: day?.activity ? heatBackground(day.netPnl, maxAbs) : undefined }}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-faint">{DOW[weekdayIndex(key)]}</span>
@@ -209,7 +209,7 @@ export default function Calendar({
                     {Number(key.slice(8))}
                   </span>
                 </div>
-                {day ? (
+                {day?.activity ? (
                   <>
                     <div
                       className={`num mt-4 text-[17px] font-semibold ${day.netPnl >= 0 ? "text-profit" : "text-loss"}`}
@@ -346,7 +346,7 @@ function DayCell({
       className={`group relative border-r border-line-soft px-2.5 text-left transition-colors last:border-r-0 hover:bg-surface-2/70 ${
         compact ? "py-2" : "py-2.5"
       } ${inMonth ? "" : "opacity-40"}`}
-      style={{ background: day ? heatBackground(day.netPnl, maxAbs) : undefined, minHeight: compact ? 84 : 104 }}
+      style={{ background: day?.activity ? heatBackground(day.netPnl, maxAbs) : undefined, minHeight: compact ? 84 : 104 }}
     >
       <div className="flex items-center justify-between">
         <span
@@ -363,7 +363,7 @@ function DayCell({
         {day?.hasNote && <span className="h-1.5 w-1.5 rounded-full bg-brand" title="Journal note" />}
       </div>
 
-      {day ? (
+      {day?.activity ? (
         <div className="mt-2.5">
           <div className={`num text-[14px] font-semibold leading-tight ${valueTone}`}>{value}</div>
           <div className="mt-1 text-[10.5px] leading-tight text-faint">

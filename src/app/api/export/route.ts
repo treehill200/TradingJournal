@@ -2,7 +2,7 @@ import { context } from "@/lib/context";
 import { fail, guard } from "@/lib/api";
 import { listBalanceEvents, listDayEntries, listNotes, listTrades } from "@/lib/store";
 import { parseFilters } from "@/lib/filters";
-import { applyFilters, buildDayRollups, tradeR } from "@/lib/metrics";
+import { applyFilters, buildDayRollups, filterDayEntries, tradeR } from "@/lib/metrics";
 import { toCsv } from "@/lib/csv";
 
 export const runtime = "nodejs";
@@ -44,9 +44,9 @@ export async function GET(req: Request) {
       );
       name = "trades";
     } else if (type === "days") {
-      const rollups = [...buildDayRollups(filtered, account, dayEntries, notes).values()].sort((a, b) =>
-        a.date < b.date ? -1 : 1,
-      );
+      const rollups = [...buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes).values()]
+        .filter((d) => d.activity)
+        .sort((a, b) => (a.date < b.date ? -1 : 1));
       csv = toCsv(
         ["date", "net_pnl", "gross_pnl", "fees", "trades", "wins", "losses", "win_rate", "r_multiple", "symbols"],
         rollups.map((d) => [

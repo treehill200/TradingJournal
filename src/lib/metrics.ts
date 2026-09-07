@@ -105,13 +105,35 @@ export function applyFilters(trades: Trade[], filters: Filters): Trade[] {
     if (filters.result === "wins" && t.net_pnl <= 0) return false;
     if (filters.result === "losses" && t.net_pnl >= 0) return false;
     if (tags.length) {
-      const own = t.tags.toLowerCase();
+      // Match whole tags, so filtering on "a" cannot pull in "fade".
+      const own = t.tags.toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
       if (!tags.some((tag) => own.includes(tag))) return false;
     }
     if (search) {
       const haystack = `${t.symbol} ${t.tags} ${t.notes}`.toLowerCase();
       if (!haystack.includes(search)) return false;
     }
+    return true;
+  });
+}
+
+/**
+ * Manual day entries carry a date and a total, and nothing else — no symbol,
+ * side or tags. So a date range narrows them, and any filter that asks about a
+ * trade's attributes excludes them rather than silently letting them through.
+ */
+export function filterDayEntries(entries: DayEntry[], filters: Filters): DayEntry[] {
+  const attributeFilter =
+    filters.symbols.length > 0 ||
+    filters.sides.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.result !== "all" ||
+    Boolean(filters.search?.trim());
+  if (attributeFilter) return [];
+
+  return entries.filter((entry) => {
+    if (filters.from && entry.date < filters.from) return false;
+    if (filters.to && entry.date > filters.to) return false;
     return true;
   });
 }
@@ -135,6 +157,9 @@ export type DayRollup = {
   symbols: string[];
   manual: boolean;
   hasNote: boolean;
+  /** False for a day that exists only because it carries a journal note.
+   *  Writing about a day you did not trade does not make it a trading day. */
+  activity: boolean;
 };
 
 export function buildDayRollups(
@@ -151,7 +176,7 @@ export function buildDayRollups(
       day = {
         date, netPnl: 0, grossPnl: 0, fees: 0, trades: 0, wins: 0, losses: 0,
         breakeven: 0, winRate: null, rMultiple: null, volume: 0, symbols: [],
-        manual: false, hasNote: false,
+        manual: false, hasNote: false, activity: false,
       };
       map.set(date, day);
     }
@@ -219,6 +244,7 @@ export function buildDayRollups(
     const r = rTotals.get(day.date);
     day.rMultiple = r && r.count ? r.sum : null;
     day.symbols = [...(symbolSets.get(day.date) ?? [])].sort();
+    day.activity = day.trades > 0 || day.netPnl !== 0 || day.manual;
     day.netPnl = round2(day.netPnl);
     day.grossPnl = round2(day.grossPnl);
     day.fees = round2(day.fees);
@@ -281,7 +307,7 @@ export function summarize(trades: Trade[], account: Account, days: DayRollup[]):
     .map((t) => tradeR(t, account))
     .filter((r): r is number => r !== null && Number.isFinite(r));
 
-  const sorted = [...days].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const sorted = [...days].filter((d) => d.activity).sort((a, b) => (a.date < b.date ? -1 : 1));
   const greenDays = sorted.filter((d) => d.netPnl > 0).length;
   const redDays = sorted.filter((d) => d.netPnl < 0).length;
   const flatDays = sorted.length - greenDays - redDays;
@@ -376,7 +402,7 @@ export function buildEquityCurve(
   events: BalanceEvent[],
 ): EquityPoint[] {
   const byDay = new Map<string, number>();
-  for (const day of days) byDay.set(day.date, day.netPnl);
+  for (const day of days) if (day.activity) byDay.set(day.date, day.netPnl);
 
   const flows = new Map<string, number>();
   for (const e of events) {
@@ -488,6 +514,7 @@ export function byHour(trades: Trade[]): Bucket[] {
 export function byMonth(days: DayRollup[]): Bucket[] {
   const map = new Map<string, Bucket>();
   for (const day of days) {
+    if (!day.activity) continue;
     const key = monthKey(day.date);
     let bucket = map.get(key);
     if (!bucket) {
