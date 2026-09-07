@@ -12,14 +12,21 @@ export default function BarChart({
   ccy,
   height = 220,
   horizontal = false,
+  valueFormat = "currency",
 }: {
   data: BarDatum[];
   ccy: string;
   height?: number;
   horizontal?: boolean;
+  /** "count" for histograms, where the bar height is a tally, not money. */
+  valueFormat?: "currency" | "count";
 }) {
+  const format = (value: number, compact = false) =>
+    valueFormat === "count"
+      ? String(Math.abs(Math.round(value)))
+      : currency(value, ccy, { sign: true, compact });
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const [width, setWidth] = useState(320);
   const [hover, setHover] = useState<number | null>(null);
 
   useEffect(() => {
@@ -43,7 +50,7 @@ export default function BarChart({
 
   if (horizontal) {
     return (
-      <div ref={ref} className="space-y-1.5">
+      <div ref={ref} className="w-full space-y-1.5 overflow-hidden">
         {data.map((d, i) => {
           const pct = (Math.abs(d.value) / maxAbs) * 50;
           const positive = d.value >= 0;
@@ -69,7 +76,7 @@ export default function BarChart({
                   positive ? "text-profit" : "text-loss"
                 }`}
               >
-                {currency(d.value, ccy, { sign: true, compact: true })}
+                {format(d.value, true)}
               </div>
               {d.sub && <div className="w-[68px] shrink-0 text-right text-[11px] text-faint">{d.sub}</div>}
             </div>
@@ -88,7 +95,7 @@ export default function BarChart({
   const barW = Math.max(3, Math.min(38, step * 0.62));
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className="relative w-full overflow-hidden">
       <svg width={w} height={height} onMouseLeave={() => setHover(null)}>
         <line x1={pad.left} x2={w - pad.right} y1={zeroY} y2={zeroY} stroke={COLORS.line} />
         {[1, -1].map((sign) => (
@@ -101,7 +108,7 @@ export default function BarChart({
             fill={COLORS.faint}
             className="num"
           >
-            {currency(sign * maxAbs, ccy, { compact: true, sign: true })}
+            {format(sign * maxAbs, true)}
           </text>
         ))}
 
@@ -148,7 +155,7 @@ export default function BarChart({
         >
           <div className="text-[11px] text-faint">{data[hover].label}</div>
           <div className={`num font-semibold ${data[hover].value >= 0 ? "text-profit" : "text-loss"}`}>
-            {currency(data[hover].value, ccy, { sign: true })}
+            {format(data[hover].value)}
           </div>
           {data[hover].sub && <div className="text-[11px] text-faint">{data[hover].sub}</div>}
         </div>

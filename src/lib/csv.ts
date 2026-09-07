@@ -86,14 +86,31 @@ export function parseDelimited(input: string, delimiter?: string): Table {
   return { headers, rows: body, delimiter: d };
 }
 
-/** Header text -> comparable key: lowercase alphanumerics only. */
+const CURRENCY_TOKENS = new Set([
+  "usd", "eur", "gbp", "jpy", "aud", "cad", "chf", "nzd", "inr", "brl", "zar",
+  "sek", "nok", "dkk", "hkd", "sgd", "mxn", "pln", "try", "cny", "usdt", "usdc",
+]);
+
+/**
+ * Header text -> comparable key.
+ *
+ * Two details matter for real exports: a "%" column must never look like a
+ * money column ("Profit %" and "Profit USD" are different things), and a
+ * trailing currency code is noise ("Profit USD" is just profit).
+ */
 export function normalizeHeader(header: string): string {
-  return header
+  const tokens = header
     .toLowerCase()
     .replace(/[‐-―]/g, "-")
+    .replace(/%/g, " pct ")
+    .replace(/#/g, " num ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
-    .replace(/\s+/g, "_");
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (tokens.length > 1 && CURRENCY_TOKENS.has(tokens[tokens.length - 1])) tokens.pop();
+  return tokens.join("_");
 }
 
 /* ------------------------------------------------------------------ */

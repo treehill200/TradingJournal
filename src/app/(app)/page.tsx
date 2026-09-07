@@ -72,8 +72,14 @@ export default async function DashboardPage({
     return next;
   }, 0);
 
-  const topSymbols = bySymbol(filtered).slice(0, 8);
-  const worstSymbols = bySymbol(filtered).slice(-5).reverse();
+  // Best first, then the worst performers that are not already listed.
+  const symbolBuckets = bySymbol(filtered);
+  const topSymbols = symbolBuckets.slice(0, 8);
+  const topKeys = new Set(topSymbols.map((b) => b.key));
+  const worstSymbols = symbolBuckets
+    .slice(-5)
+    .reverse()
+    .filter((b) => !topKeys.has(b.key));
 
   return (
     <>
@@ -191,7 +197,7 @@ export default async function DashboardPage({
               <BarChart
                 horizontal
                 ccy={ccy}
-                data={[...topSymbols, ...worstSymbols.filter((s) => !topSymbols.includes(s))].map((b) => ({
+                data={[...topSymbols, ...worstSymbols].map((b) => ({
                   label: b.label,
                   value: b.netPnl,
                   sub: `${b.trades}t · ${percent(b.winRate, 0)}`,

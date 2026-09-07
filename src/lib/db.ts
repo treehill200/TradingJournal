@@ -201,7 +201,15 @@ export type Row = Record<string, unknown>;
 export async function all<T = Row>(sql: string, args: InValue[] = []): Promise<T[]> {
   const c = await db();
   const res = await c.execute({ sql, args });
-  return res.rows as unknown as T[];
+  // libSQL rows are array-like objects; React server components can only hand
+  // plain objects to client components, so rebuild them from the column list.
+  return res.rows.map((row) => {
+    const out: Row = {};
+    res.columns.forEach((column, i) => {
+      out[column] = row[i];
+    });
+    return out as T;
+  });
 }
 
 export async function one<T = Row>(sql: string, args: InValue[] = []): Promise<T | null> {

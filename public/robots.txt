@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /$
+Allow: /login
+Allow: /register
+Disallow: /api/
+Disallow: /calendar
+Disallow: /journal
+Disallow: /statistics
+Disallow: /reports
+Disallow: /import
+Disallow: /settings

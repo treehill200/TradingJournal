@@ -23,7 +23,7 @@ export type Dataset = "trades" | "balance";
 export type TradeMode = "closed" | "paired" | "fills";
 
 export type Field =
-  | "symbol" | "side" | "quantity" | "entryPrice" | "exitPrice" | "price" | "stopPrice"
+  | "symbol" | "side" | "quantity" | "entryPrice" | "exitPrice" | "price" | "stopPrice" | "takeProfit"
   | "openTime" | "closeTime" | "time" | "netPnl" | "grossPnl" | "commission" | "swap"
   | "orderId" | "tradeId" | "status" | "type" | "amount" | "balance" | "note";
 
@@ -35,10 +35,11 @@ const ALIASES: Record<Field, string[]> = {
   exitPrice: ["exit_price", "exit", "close_price", "avg_exit_price", "price_close", "closing_price", "sell_price", "exit_price_usd", "average_exit"],
   price: ["price", "fill_price", "avg_price", "average_price", "execution_price", "filled_price", "traded_price", "price_usd", "avg_fill_price", "limit_price"],
   stopPrice: ["stop_loss", "sl", "stop_price", "stop", "stop_loss_price"],
+  takeProfit: ["take_profit", "tp", "target_price", "take_profit_price", "profit_target"],
   openTime: ["open_time", "opening_time", "entry_time", "time_opened", "date_open", "open_date", "entry_date", "placing_time", "placed_time", "order_time", "created_time", "entry_date_time", "opened"],
   closeTime: ["close_time", "closing_time", "exit_time", "time_closed", "date_close", "close_date", "closing_date", "exit_date", "closed", "exit_date_time", "fill_time", "filled_time", "execution_time", "transaction_time", "settlement_date"],
   time: ["time", "date", "date_time", "datetime", "timestamp", "trade_time", "when", "date_time_utc"],
-  netPnl: ["net_p_l", "net_pnl", "net_profit", "realized_p_l", "realized_pnl", "realised_p_l", "realised_pnl", "p_l", "pnl", "profit", "profit_loss", "profit_usd", "p_l_usd", "net_p_l_usd", "result", "realized", "closed_p_l", "gain_loss", "p_l_value", "profit_amount"],
+  netPnl: ["net_p_l", "net_pnl", "net_profit", "realized_p_l", "realized_pnl", "realised_p_l", "realised_pnl", "p_l", "pnl", "profit_loss", "profit", "p_l_usd", "net_p_l_usd", "result", "realized", "closed_p_l", "gain_loss", "p_l_value", "profit_amount"],
   grossPnl: ["gross_p_l", "gross_pnl", "gross_profit", "gross_p_l_usd"],
   commission: ["commission", "commissions", "fee", "fees", "commission_usd", "commission_paid", "total_fees", "broker_fee"],
   swap: ["swap", "rollover", "financing", "overnight_fee", "borrow_fee", "interest_charge", "funding"],
@@ -51,11 +52,12 @@ const ALIASES: Record<Field, string[]> = {
   note: ["note", "notes", "comment", "description", "remark", "memo", "reason", "label"],
 };
 
-// Fields whose alias may collide with a more specific one; resolved last.
+// Most specific fields first, so a loose alias cannot steal a column that a
+// precise one wants ("Take Profit" must not become the P&L column).
 const RESOLUTION_ORDER: Field[] = [
-  "netPnl", "grossPnl", "entryPrice", "exitPrice", "closeTime", "openTime", "stopPrice",
-  "symbol", "quantity", "commission", "swap", "balance", "tradeId", "status", "amount",
-  "price", "side", "type", "time", "orderId", "note",
+  "takeProfit", "stopPrice", "netPnl", "grossPnl", "entryPrice", "exitPrice", "closeTime",
+  "openTime", "symbol", "quantity", "commission", "swap", "balance", "tradeId", "status",
+  "amount", "price", "side", "type", "time", "orderId", "note",
 ];
 
 export type Mapping = Partial<Record<Field, number>>;
@@ -79,9 +81,9 @@ export function buildMapping(headers: string[], override: Partial<Record<Field, 
     taken.add(idx);
   };
 
+  // Phase 1: every exact header match, across all fields, wins first.
   for (const field of RESOLUTION_ORDER) {
     if (mapping[field] !== undefined) continue;
-    // Exact alias match first, then a contains-match.
     for (const alias of ALIASES[field]) {
       const idx = norm.indexOf(alias);
       if (idx >= 0 && !taken.has(idx)) {
@@ -89,9 +91,16 @@ export function buildMapping(headers: string[], override: Partial<Record<Field, 
         break;
       }
     }
+  }
+
+  // Phase 2: fall back to whole-word prefix/suffix matches such as
+  // "net_p_l_usd" -> netPnl, but never a match buried mid-header.
+  for (const field of RESOLUTION_ORDER) {
     if (mapping[field] !== undefined) continue;
     for (const alias of ALIASES[field]) {
-      const idx = norm.findIndex((h, i) => !taken.has(i) && h.includes(alias));
+      const idx = norm.findIndex(
+        (h, i) => !taken.has(i) && (h.startsWith(`${alias}_`) || h.endsWith(`_${alias}`)),
+      );
       if (idx >= 0) {
         claim(field, idx);
         break;
@@ -616,6 +625,7 @@ export function analyze(
     mode?: TradeMode;
     override?: Partial<Record<Field, string>>;
     dayFirst?: boolean;
+    symbol?: string;
   } = {},
 ): Analysis {
   const mapping = buildMapping(table.headers, options.override);
@@ -636,6 +646,18 @@ export function analyze(
         : mode === "paired"
           ? { ...normalizePaired(table, mapping, dayFirst), events: [] as NormalizedBalanceEvent[] }
           : { ...normalizeFills(table, mapping, dayFirst), events: [] as NormalizedBalanceEvent[] };
+
+  // Exports without a symbol column (Strategy Tester) can be labelled at
+  // import time; the label is part of the key so two instruments never merge.
+  const symbolOverride = options.symbol?.trim().toUpperCase().slice(0, 40);
+  if (symbolOverride) {
+    for (const trade of result.trades) {
+      if (trade.symbol === "—") {
+        trade.symbol = symbolOverride;
+        trade.dedupeKey = `${symbolOverride}|${trade.dedupeKey}`;
+      }
+    }
+  }
 
   // Never let one file insert the same row twice.
   const seen = new Set<string>();

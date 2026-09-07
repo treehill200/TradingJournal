@@ -7,6 +7,20 @@ import { currency, shortDate } from "@/lib/format";
 export type CurvePoint = { date: string; balance: number; dayPnl: number; drawdown: number };
 
 /** Equity curve with a hover crosshair. Drawn by hand so it matches the theme. */
+/** Axis money labels: no cents once the numbers get big, so they always fit. */
+function axisMoney(value: number, ccy: string): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return currency(value, ccy, { compact: true });
+  if (abs >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: ccy || "USD",
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+  return currency(value, ccy);
+}
+
 export default function EquityChart({
   points,
   ccy,
@@ -19,7 +33,7 @@ export default function EquityChart({
   mode?: "balance" | "drawdown";
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(720);
+  const [width, setWidth] = useState(320);
   const [hover, setHover] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,13 +47,13 @@ export default function EquityChart({
 
   if (points.length < 2) {
     return (
-      <div ref={ref} className="grid place-items-center text-[13px] text-faint" style={{ height }}>
+      <div ref={ref} className="grid w-full place-items-center overflow-hidden text-[13px] text-faint" style={{ height }}>
         Not enough data yet — import trades to draw the curve.
       </div>
     );
   }
 
-  const pad = { top: 16, right: 14, bottom: 26, left: 62 };
+  const pad = { top: 16, right: 14, bottom: 26, left: 74 };
   const w = Math.max(width, 320);
   const innerW = w - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
@@ -61,6 +75,8 @@ export default function EquityChart({
   const up = values[values.length - 1] >= values[0];
   const stroke = mode === "drawdown" ? COLORS.loss : up ? COLORS.profit : COLORS.loss;
 
+  // Tight drawdown ranges need a decimal or every tick reads the same.
+  const ddDigits = range < 5 ? 1 : 0;
   const ticks = 4;
   const gridValues = Array.from({ length: ticks + 1 }, (_, i) => min + (range * i) / ticks);
   const labelEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(innerW / 92))));
@@ -68,7 +84,7 @@ export default function EquityChart({
   const active = hover === null ? null : points[hover];
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className="relative w-full overflow-hidden">
       <svg
         width={w}
         height={height}
@@ -98,7 +114,7 @@ export default function EquityChart({
               strokeDasharray={i === 0 ? undefined : "3 4"}
             />
             <text x={pad.left - 10} y={y(value) + 4} textAnchor="end" fontSize="10.5" fill={COLORS.faint} className="num">
-              {mode === "drawdown" ? `${value.toFixed(0)}%` : currency(value, ccy, { compact: true })}
+              {mode === "drawdown" ? `${value.toFixed(ddDigits)}%` : axisMoney(value, ccy)}
             </text>
           </g>
         ))}
