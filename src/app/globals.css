@@ -9,7 +9,9 @@
   --color-line-soft: #151b26;
   --color-ink: #e8ecf5;
   --color-muted: #8d97ab;
-  --color-faint: #5c667a;
+  /* Lifted from #5c667a, which only reached 3.3:1 — this clears WCAG AA
+     (4.5:1) on every surface it is drawn on, including cards and inputs. */
+  --color-faint: #79849a;
   --color-brand: #6d8dff;
   --color-brand-dim: #3d55b8;
   --color-profit: #34d399;
@@ -52,6 +54,31 @@ body {
 
 ::selection {
   background: rgba(109, 141, 255, 0.32);
+}
+
+/* Keyboard focus must always be visible; pointer focus stays quiet. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-brand);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  transition: top 140ms ease;
+}
+.skip-link:focus {
+  top: 12px;
 }
 
 /* scrollbars ------------------------------------------------------- */
@@ -179,7 +206,7 @@ body {
     box-shadow: 0 0 0 3px rgba(109, 141, 255, 0.14);
   }
   .input::placeholder {
-    color: #4d5768;
+    color: #737d96;
   }
   textarea.input {
     height: auto;

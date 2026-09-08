@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
+import { useDialog } from "@/components/useDialog";
 import {
   IconCalendar, IconClose, IconDashboard, IconJournal, IconLogout, IconPanel,
   IconReport, IconSettings, IconStats, IconUpload, Logo,
@@ -46,11 +47,7 @@ export default function Shell({
     setMobileOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMobileOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -117,22 +114,39 @@ export default function Shell({
   return (
     <ShellContext.Provider value={{ openMobile: () => setMobileOpen(true) }}>
       <div className="flex min-h-screen">
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         <aside className="hidden w-[260px] shrink-0 border-r border-line bg-surface/60 backdrop-blur lg:block">
           <div className="sticky top-0 h-screen">{sidebar}</div>
         </aside>
 
-        {mobileOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div className="absolute inset-0 bg-black/60 animate-fade" onClick={() => setMobileOpen(false)} />
-            <aside className="absolute left-0 top-0 h-full w-[280px] border-r border-line bg-surface animate-slide-in">
-              {sidebar}
-            </aside>
-          </div>
-        )}
+        {mobileOpen && <MobileNav onClose={() => setMobileOpen(false)}>{sidebar}</MobileNav>}
 
-        <div className="min-w-0 flex-1 overflow-x-hidden">{children}</div>
+        <main id="main" className="min-w-0 flex-1 overflow-x-hidden">
+          {children}
+        </main>
       </div>
     </ShellContext.Provider>
+  );
+}
+
+function MobileNav({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const ref = useDialog<HTMLElement>(onClose);
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <div className="absolute inset-0 bg-black/60 animate-fade" onClick={onClose} />
+      <aside
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        tabIndex={-1}
+        className="absolute left-0 top-0 h-full w-[280px] border-r border-line bg-surface outline-none animate-slide-in"
+      >
+        {children}
+      </aside>
+    </div>
   );
 }
 

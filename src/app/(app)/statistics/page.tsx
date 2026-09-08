@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
-import { activeAccountId } from "@/lib/active-account";
-import { loadWorkspace } from "@/lib/store";
-import { parseFilters } from "@/lib/filters";
+import { loadJournalView, type SearchParams } from "@/lib/view";
 import {
-  applyFilters, buildDayRollups, buildEquityCurve, byHour, byMonth, bySide, bySymbol,
-  byTag, byWeekday, filterDayEntries, summarize, tradeR,
+  byHour, byMonth, bySide, bySymbol, byTag, byWeekday, tradeR,
 } from "@/lib/metrics";
 import { currency, number, percent, shortDate } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
@@ -22,29 +17,13 @@ export const dynamic = "force-dynamic";
 export default async function StatisticsPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const user = await getUser();
-  if (!user) redirect("/login");
+  const {
+    account, ccy, allTrades, trades, days, summary, curve, symbols, tags,
+  } = await loadJournalView(searchParams);
 
-  const filters = parseFilters(await searchParams);
-  const { account, trades, events, dayEntries, notes } = await loadWorkspace(
-    user.id,
-    await activeAccountId(),
-  );
-  const ccy = account.currency;
-  const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes);
-  const days = [...rollups.values()].filter((d) => d.activity).sort((a, b) => (a.date < b.date ? -1 : 1));
-  const summary = summarize(filtered, account, days);
-  const curve = buildEquityCurve(account, days, events);
-
-  const symbols = [...new Set(trades.map((t) => t.symbol))].sort();
-  const tags = [
-    ...new Set(trades.flatMap((t) => t.tags.split(",").map((x) => x.trim()).filter(Boolean))),
-  ].sort();
-
-  if (!trades.length && !dayEntries.length) {
+  if (!allTrades.length && !days.length) {
     return (
       <>
         <PageHeader title="Statistics" subtitle="Nothing to measure yet" />
@@ -61,11 +40,11 @@ export default async function StatisticsPage({
     );
   }
 
-  const rValues = filtered
+  const rValues = trades
     .map((t) => tradeR(t, account))
     .filter((r): r is number => r !== null && Number.isFinite(r));
 
-  const distribution = buildDistribution(filtered.map((t) => t.net_pnl));
+  const distribution = buildDistribution(trades.map((t) => t.net_pnl));
 
   return (
     <>
@@ -139,12 +118,12 @@ export default async function StatisticsPage({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Breakdown title="By symbol" subtitle="Where the money actually comes from" data={bySymbol(filtered)} ccy={ccy} />
-          <Breakdown title="By weekday" subtitle="Closing day of the week" data={byWeekday(filtered)} ccy={ccy} />
-          <Breakdown title="By hour closed" subtitle="Hour of day the trade was closed" data={byHour(filtered)} ccy={ccy} />
-          <Breakdown title="Long vs short" subtitle="Direction bias" data={bySide(filtered)} ccy={ccy} />
+          <Breakdown title="By symbol" subtitle="Where the money actually comes from" data={bySymbol(trades)} ccy={ccy} />
+          <Breakdown title="By weekday" subtitle="Closing day of the week" data={byWeekday(trades)} ccy={ccy} />
+          <Breakdown title="By hour closed" subtitle="Hour of day the trade was closed" data={byHour(trades)} ccy={ccy} />
+          <Breakdown title="Long vs short" subtitle="Direction bias" data={bySide(trades)} ccy={ccy} />
           {tags.length > 0 && (
-            <Breakdown title="By tag" subtitle="Your own labels" data={byTag(filtered)} ccy={ccy} />
+            <Breakdown title="By tag" subtitle="Your own labels" data={byTag(trades)} ccy={ccy} />
           )}
           <Breakdown title="By month" subtitle="Calendar month totals" data={byMonth(days)} ccy={ccy} />
         </div>

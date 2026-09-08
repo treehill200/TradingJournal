@@ -88,6 +88,12 @@ export default function EquityChart({
       <svg
         width={w}
         height={height}
+        role="img"
+        aria-label={
+          mode === "drawdown"
+            ? `Drawdown from peak across ${points.length} days, deepest ${Math.min(...values).toFixed(1)} percent.`
+            : `Account balance across ${points.length} days, from ${currency(points[0].balance, ccy)} to ${currency(points[points.length - 1].balance, ccy)}.`
+        }
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();

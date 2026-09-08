@@ -118,7 +118,17 @@ export function Logo({ size = 34 }: { size?: number }) {
         boxShadow: "0 6px 18px -8px rgba(109,141,255,.9)",
       }}
     >
-      <svg viewBox="0 0 24 24" width={size * 0.6} height={size * 0.6} fill="none" stroke="#05070c" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        width={size * 0.6}
+        height={size * 0.6}
+        fill="none"
+        stroke="#05070c"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
         <path d="M3 12h3.5l2-6 3.5 12 2.5-8 1.5 2H21" />
       </svg>
     </div>

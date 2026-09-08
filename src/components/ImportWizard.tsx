@@ -333,16 +333,24 @@ function FileCard({
             />
           </div>
 
-          {report.dateRange && (
-            <div className="border-b border-line px-4 py-2.5 text-[12px] text-muted">
-              Closing dates <span className="num text-ink">{report.dateRange.from}</span> →{" "}
-              <span className="num text-ink">{report.dateRange.to}</span>
-              {report.skipped > 0 && <span className="text-faint"> · {report.skipped} row(s) skipped</span>}
-              {report.openPositions > 0 && (
-                <span className="text-faint"> · {report.openPositions} still open</span>
-              )}
-            </div>
-          )}
+          <div className="border-b border-line px-4 py-2.5 text-[12px] text-muted">
+            {report.dateRange ? (
+              <>
+                {report.dataset === "balance" ? "Dates" : "Closing dates"}{" "}
+                <span className="num text-ink">{report.dateRange.from}</span> →{" "}
+                <span className="num text-ink">{report.dateRange.to}</span>
+              </>
+            ) : (
+              <span className="text-faint">No dated rows could be read from this file.</span>
+            )}
+            {report.fresh === 0 && report.duplicates > 0 && (
+              <span className="text-faint"> · everything here is already in your journal</span>
+            )}
+            {report.skipped > 0 && <span className="text-faint"> · {report.skipped} row(s) skipped</span>}
+            {report.openPositions > 0 && (
+              <span className="text-faint"> · {report.openPositions} still open</span>
+            )}
+          </div>
 
           {report.warnings.map((warning) => (
             <div key={warning} className="flex items-start gap-2 border-b border-line px-4 py-2.5 text-[12px] text-warn">

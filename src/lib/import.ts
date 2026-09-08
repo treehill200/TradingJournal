@@ -97,11 +97,13 @@ export async function runImport(
   if (analysis.dataset === "trades") {
     for (const trade of analysis.trades) {
       const duplicate = existing.has(trade.dedupeKey);
+      // The range describes the whole file, so it still reads sensibly when
+      // every row turns out to be one you already have.
+      dates.push(trade.closeDate);
       if (duplicate) report.duplicates++;
       else {
         report.fresh++;
         report.netPnl += trade.netPnl;
-        dates.push(trade.closeDate);
       }
 
       if (report.preview.length < 25) {
@@ -143,13 +145,13 @@ export async function runImport(
   } else {
     for (const event of analysis.events) {
       const duplicate = existing.has(event.dedupeKey);
+      dates.push(event.eventDate);
       if (duplicate) report.duplicates++;
       else {
         report.fresh++;
         // Only rows that actually move cash count towards the reported total;
         // commission and P&L rows are already represented by the trades.
         if (CASH_FLOW_KINDS.has(event.kind)) report.netPnl += event.amount;
-        dates.push(event.eventDate);
       }
 
       if (report.preview.length < 25) {

@@ -68,6 +68,9 @@ and duplicate counts, all before anything is written.</sub>
 - Manual entry: add individual trades, or log a whole day's totals at once
 - Multiple trading accounts (paper / live / backtest) kept completely apart
 - Recovery codes, so a forgotten password does not mean a lost journal
+- Usable by keyboard and screen reader: a skip link, real focus trapping in the
+  day drawer and mobile nav, calendar days that announce their date and result,
+  labelled charts, and a palette that meets WCAG AA contrast
 - Account settings: currency, starting balance, and the risk per trade that
   defines 1R
 
@@ -166,6 +169,23 @@ Deploy behind HTTPS. Session cookies are set `Secure` automatically when
 `NODE_ENV=production`.
 
 ---
+
+## Accessibility
+
+- Every interactive element is reachable by keyboard, with a visible focus ring
+  and a **Skip to content** link as the first tab stop.
+- The day drawer and the mobile navigation are real dialogs: focus moves in on
+  open, Tab cannot leave, Escape closes, and focus returns to whatever opened
+  them.
+- Calendar cells announce the whole day — "Thursday, September 3, 2026:
+  +$281.00, 2 trades, 100% win rate, has a journal entry" — rather than a bare
+  number, and today is marked with `aria-current`.
+- Charts carry a text summary; decorative bars and icons are hidden from
+  assistive technology, since the same figures are already in the text beside
+  them.
+- All text meets WCAG AA contrast (4.5:1). The muted `faint` token used for
+  small sublines was originally 3.3:1 and was lifted until it cleared 4.5:1 on
+  every surface it is drawn on.
 
 ## Privacy and security
 
@@ -266,6 +286,8 @@ src/
     tradingview.ts     column mapping, layout detection, FIFO matching
     import.ts          duplicate detection, writing, full refresh
     metrics.ts         day rollups, summary stats, equity curve, breakdowns
+    view.ts            the one data pipeline the dashboard, calendar,
+                       statistics and reports pages all share
   middleware.ts        security headers and the CSP nonce
 tests/               unit tests for csv, tradingview and metrics
 ```

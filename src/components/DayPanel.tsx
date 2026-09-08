@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useDialog } from "@/components/useDialog";
 import { useRouter } from "next/navigation";
 import { IconClose, IconPencil, IconPlus, IconTrash } from "@/components/Icons";
 import { currency, longDate, percent, timeOfDay } from "@/lib/format";
@@ -40,15 +41,7 @@ export default function DayPanel({
     load();
   }, [load]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
+  const dialogRef = useDialog<HTMLElement>(onClose);
 
   async function send(url: string, method: string, body?: unknown) {
     setBusy(true);
@@ -77,7 +70,14 @@ export default function DayPanel({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/60 animate-fade" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-[560px] flex-col border-l border-line bg-surface animate-slide-in">
+      <aside
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Trading day ${longDate(date)}`}
+        tabIndex={-1}
+        className="relative flex h-full w-full max-w-[560px] flex-col border-l border-line bg-surface outline-none animate-slide-in"
+      >
         <header className="flex items-start gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-semibold tracking-tight">{longDate(date)}</div>

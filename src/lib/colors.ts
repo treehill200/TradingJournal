@@ -6,7 +6,7 @@ export const COLORS = {
   brand: "#6d8dff",
   brandSoft: "rgba(109, 141, 255, 0.18)",
   muted: "#8d97ab",
-  faint: "#5c667a",
+  faint: "#79849a",
   line: "#1c2331",
   surface: "#0b0f17",
 } as const;

@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
-import { activeAccountId } from "@/lib/active-account";
-import { loadWorkspace } from "@/lib/store";
-import { parseFilters } from "@/lib/filters";
-import { applyFilters, buildDayRollups, byMonth, bySymbol, filterDayEntries, formatMonthLabel, summarize } from "@/lib/metrics";
+import { loadJournalView, type SearchParams } from "@/lib/view";
+import { byMonth, bySymbol, formatMonthLabel } from "@/lib/metrics";
 import { currency, percent } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import FilterBar from "@/components/FilterBar";
@@ -16,33 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const user = await getUser();
-  if (!user) redirect("/login");
-
-  const sp = await searchParams;
-  const filters = parseFilters(sp);
-  const { account, trades, dayEntries, notes } = await loadWorkspace(user.id, await activeAccountId());
-  const ccy = account.currency;
-
-  const filtered = applyFilters(trades, filters);
-  const rollups = buildDayRollups(filtered, account, filterDayEntries(dayEntries, filters), notes);
-  const days = [...rollups.values()].filter((d) => d.activity);
-  const summary = summarize(filtered, account, days);
+  const { ccy, trades, days, summary, query, symbols, tags } = await loadJournalView(searchParams);
   const months = byMonth(days).reverse();
-  const symbols = bySymbol(filtered);
-
-  const query = new URLSearchParams(
-    Object.entries(sp).flatMap(([k, v]) =>
-      v === undefined ? [] : [[k, Array.isArray(v) ? v.join(",") : v] as [string, string]],
-    ),
-  ).toString();
-
-  const allSymbols = [...new Set(trades.map((t) => t.symbol))].sort();
-  const allTags = [
-    ...new Set(trades.flatMap((t) => t.tags.split(",").map((x) => x.trim()).filter(Boolean))),
-  ].sort();
+  const symbolRows = bySymbol(trades);
 
   return (
     <>
@@ -52,7 +26,7 @@ export default async function ReportsPage({
       />
 
       <div className="space-y-4 px-4 py-5 sm:px-6">
-        <FilterBar symbols={allSymbols} tags={allTags} />
+        <FilterBar symbols={symbols} tags={tags} />
         <ExportLinks query={query} />
 
         <section className="card overflow-hidden">
@@ -111,7 +85,7 @@ export default async function ReportsPage({
             <h2 className="text-[14px] font-semibold">Instrument report</h2>
             <p className="text-[11.5px] text-faint">Per-symbol performance across the filtered period.</p>
           </div>
-          {symbols.length === 0 ? (
+          {symbolRows.length === 0 ? (
             <p className="px-4 py-10 text-center text-[13px] text-faint">No trades in this selection.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -126,7 +100,7 @@ export default async function ReportsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {symbols.map((s) => (
+                  {symbolRows.map((s) => (
                     <tr key={s.key} className="border-b border-line-soft last:border-0">
                       <td className="px-4 py-2.5 font-medium">{s.label}</td>
                       <td className={`num px-4 py-2.5 font-semibold ${s.netPnl >= 0 ? "text-profit" : "text-loss"}`}>

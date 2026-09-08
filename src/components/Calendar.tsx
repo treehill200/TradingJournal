@@ -5,7 +5,7 @@ import { IconChevronLeft, IconChevronRight, IconPencil } from "@/components/Icon
 import DayPanel from "@/components/DayPanel";
 import type { DayRollup } from "@/lib/metrics";
 import { addDays, monthGrid, startOfWeek, todayKey, weekdayIndex } from "@/lib/metrics";
-import { currency, monthTitle, percent } from "@/lib/format";
+import { currency, longDate, monthTitle, percent } from "@/lib/format";
 
 export type Metric = "pnl" | "r" | "trades" | "winrate";
 type View = "month" | "week" | "list";
@@ -198,7 +198,12 @@ export default function Calendar({
               <button
                 key={key}
                 onClick={() => setSelected(key)}
-                className="card card-hover min-h-[128px] p-3 text-left"
+                aria-label={
+                  day?.activity
+                    ? `${longDate(key)}: ${currency(day.netPnl, ccy, { sign: true })}, ${day.trades} trades`
+                    : `${longDate(key)}: no trades`
+                }
+                className="card card-hover min-h-[128px] p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
                 style={{ background: day?.activity ? heatBackground(day.netPnl, maxAbs) : undefined }}
               >
                 <div className="flex items-center justify-between">
@@ -340,10 +345,21 @@ function DayCell({
           ? "text-loss"
           : "text-muted";
 
+  // Screen readers otherwise announce a bare number with no month or result.
+  const label = day?.activity
+    ? `${longDate(dateKey)}: ${currency(day.netPnl, ccy, { sign: true })}, ${day.trades} trade${
+        day.trades === 1 ? "" : "s"
+      }${day.winRate !== null ? `, ${Math.round(day.winRate)}% win rate` : ""}${
+        day.hasNote ? ", has a journal entry" : ""
+      }`
+    : `${longDate(dateKey)}: no trades. Add a day.`;
+
   return (
     <button
       onClick={() => onSelect(dateKey)}
-      className={`group relative border-r border-line-soft px-2.5 text-left transition-colors last:border-r-0 hover:bg-surface-2/70 ${
+      aria-label={label}
+      aria-current={isToday ? "date" : undefined}
+      className={`group relative border-r border-line-soft px-2.5 text-left transition-colors last:border-r-0 hover:bg-surface-2/70 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand ${
         compact ? "py-2" : "py-2.5"
       } ${inMonth ? "" : "opacity-40"}`}
       style={{ background: day?.activity ? heatBackground(day.netPnl, maxAbs) : undefined, minHeight: compact ? 84 : 104 }}
@@ -360,7 +376,9 @@ function DayCell({
         >
           {dayNumber}
         </span>
-        {day?.hasNote && <span className="h-1.5 w-1.5 rounded-full bg-brand" title="Journal note" />}
+        {day?.hasNote && (
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand" title="Journal note" />
+        )}
       </div>
 
       {day?.activity ? (

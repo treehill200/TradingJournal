@@ -1,13 +1,6 @@
 import Link from "next/link";
-import { getUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { activeAccountId } from "@/lib/active-account";
-import { loadWorkspace } from "@/lib/store";
-import { parseFilters } from "@/lib/filters";
-import {
-  accountBalance, applyFilters, buildDayRollups, buildEquityCurve, bySymbol,
-  addDays, filterDayEntries, monthKey, startOfWeek, summarize, todayKey,
-} from "@/lib/metrics";
+import { loadJournalView, type SearchParams } from "@/lib/view";
+import { addDays, bySymbol, monthKey, startOfWeek, todayKey } from "@/lib/metrics";
 import { currency, percent, shortDate } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
@@ -26,45 +19,24 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const user = await getUser();
-  if (!user) redirect("/login");
-
-  const sp = await searchParams;
-  const filters = parseFilters(sp);
-  const { account, trades, events, dayEntries, notes } = await loadWorkspace(
-    user.id,
-    await activeAccountId(),
-  );
-
-  const filtered = applyFilters(trades, filters);
-  const filteredEntries = filterDayEntries(dayEntries, filters);
-  const rollups = buildDayRollups(filtered, account, filteredEntries, notes);
-  const days = [...rollups.values()].filter((d) => d.activity).sort((a, b) => (a.date < b.date ? -1 : 1));
-  const summary = summarize(filtered, account, days);
-  const curve = buildEquityCurve(account, days, events);
-  const balance = accountBalance(account, trades, dayEntries, events);
-  const ccy = account.currency;
+  const {
+    account, ccy, trades, allTrades, days, dayMap, summary, curve, balance, symbols, tags,
+  } = await loadJournalView(searchParams);
 
   const today = todayKey();
   const weekStart = startOfWeek(today);
   const thisMonth = monthKey(today);
 
-  const todayDay = rollups.get(today);
+  const todayDay = dayMap[today]?.activity ? dayMap[today] : undefined;
   const weekDays = days.filter((d) => d.date >= weekStart && d.date <= addDays(weekStart, 6));
   const monthDays = days.filter((d) => d.date.startsWith(thisMonth));
   const weekPnl = weekDays.reduce((s, d) => s + d.netPnl, 0);
   const monthPnl = monthDays.reduce((s, d) => s + d.netPnl, 0);
   const monthR = monthDays.reduce((s, d) => s + (d.rMultiple ?? 0), 0);
 
-  const dayMap = Object.fromEntries(rollups);
-  const allSymbols = [...new Set(trades.map((t) => t.symbol))].sort();
-  const allTags = [
-    ...new Set(trades.flatMap((t) => t.tags.split(",").map((x) => x.trim()).filter(Boolean))),
-  ].sort();
-
-  const isEmpty = trades.length === 0 && dayEntries.length === 0;
+  const isEmpty = allTrades.length === 0 && days.length === 0;
   const last30 = days.slice(-30);
   const cumulative: number[] = [];
   last30.reduce((acc, d) => {
@@ -74,7 +46,7 @@ export default async function DashboardPage({
   }, 0);
 
   // Best first, then the worst performers that are not already listed.
-  const symbolBuckets = bySymbol(filtered);
+  const symbolBuckets = bySymbol(trades);
   const topSymbols = symbolBuckets.slice(0, 8);
   const topKeys = new Set(topSymbols.map((b) => b.key));
   const worstSymbols = symbolBuckets
@@ -172,7 +144,7 @@ export default async function DashboardPage({
           />
         </div>
 
-        <FilterBar symbols={allSymbols} tags={allTags} />
+        <FilterBar symbols={symbols} tags={tags} />
 
         <Calendar days={dayMap} ccy={ccy} />
 

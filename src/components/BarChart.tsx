@@ -59,7 +59,7 @@ export default function BarChart({
               <div className="w-[92px] shrink-0 truncate text-[12px] text-muted" title={d.label}>
                 {d.label}
               </div>
-              <div className="relative h-6 flex-1 rounded-md bg-surface-2">
+              <div aria-hidden="true" className="relative h-6 flex-1 rounded-md bg-surface-2">
                 <div className="absolute left-1/2 top-0 h-full w-px bg-line" />
                 <div
                   className="absolute top-1 h-4 rounded-[3px] transition-opacity group-hover:opacity-90"
@@ -96,7 +96,13 @@ export default function BarChart({
 
   return (
     <div ref={ref} className="relative w-full overflow-hidden">
-      <svg width={w} height={height} onMouseLeave={() => setHover(null)}>
+      <svg
+        width={w}
+        height={height}
+        role="img"
+        aria-label={`Bar chart of ${data.length} values, from ${format(Math.min(...data.map((d) => d.value)))} to ${format(Math.max(...data.map((d) => d.value)))}.`}
+        onMouseLeave={() => setHover(null)}
+      >
         <line x1={pad.left} x2={w - pad.right} y1={zeroY} y2={zeroY} stroke={COLORS.line} />
         {[1, -1].map((sign) => (
           <text
