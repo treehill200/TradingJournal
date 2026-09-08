@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Unauthorized } from "./auth";
+import { ConfigError } from "./db";
 
 export function json(data: unknown, init?: ResponseInit) {
   return NextResponse.json(data, init);
@@ -15,6 +16,8 @@ export async function guard<T>(fn: () => Promise<T>): Promise<T | NextResponse> 
     return await fn();
   } catch (err) {
     if (err instanceof Unauthorized) return fail("You need to sign in.", 401);
+    // A misconfigured database is the operator's to fix, and the message says how.
+    if (err instanceof ConfigError) return fail(err.message, 503);
     const message = err instanceof Error ? err.message : "Unexpected error";
     console.error("[api]", err);
     return fail(message, 500);

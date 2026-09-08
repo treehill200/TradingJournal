@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
+import { databaseStatus } from "@/lib/db";
+import SetupNotice from "@/components/SetupNotice";
 import { IconLock, IconCalendar, IconUpload, IconStats, Logo } from "@/components/Icons";
 
 const HIGHLIGHTS = [
@@ -22,7 +24,10 @@ const HIGHLIGHTS = [
 ];
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  if (await getUser()) redirect("/");
+  // Check the database before anything touches it, so a misconfigured deploy
+  // explains itself instead of failing inside a form submission.
+  const status = await databaseStatus();
+  if (status.ok && (await getUser())) redirect("/");
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_minmax(420px,0.95fr)]">
@@ -79,7 +84,9 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       </aside>
 
       <main className="flex items-center justify-center px-5 py-12 sm:px-10">
-        <div className="w-full max-w-[400px] animate-rise">{children}</div>
+        <div className="w-full max-w-[420px] animate-rise">
+          {status.ok ? children : <SetupNotice message={status.message} />}
+        </div>
       </main>
     </div>
   );

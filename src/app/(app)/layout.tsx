@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
+import { databaseStatus } from "@/lib/db";
 import { activeAccountId } from "@/lib/active-account";
 import { loadWorkspace } from "@/lib/store";
 import { accountBalance } from "@/lib/metrics";
@@ -8,6 +9,10 @@ import Shell from "@/components/Shell";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Send people to the sign-in route, which explains the problem, rather than
+  // throwing a stack trace out of the dashboard.
+  if (!(await databaseStatus()).ok) redirect("/login");
+
   const user = await getUser();
   if (!user) redirect("/login");
 

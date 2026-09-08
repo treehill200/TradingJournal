@@ -22,18 +22,85 @@ const DEFAULT_FILE = "file:./data/journal.db";
 let client: Client | null = null;
 let migrated: Promise<void> | null = null;
 
+/**
+ * A configuration problem the operator has to fix, as opposed to a bug. These
+ * carry a message written to be shown to whoever is looking at the site.
+ */
+export class ConfigError extends Error {
+  readonly isConfigError = true;
+}
+
+/** Serverless platforms give each invocation a read-only, throwaway filesystem. */
+function isServerless(): boolean {
+  return Boolean(
+    process.env.NETLIFY ||
+      process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT ||
+      process.cwd().startsWith("/var/task"),
+  );
+}
+
+const SERVERLESS_HELP =
+  "This site has no database configured. It is running on a serverless host, " +
+  "where the filesystem is read-only and thrown away between requests, so the " +
+  "default file database cannot be used. Create a libSQL database (Turso has a " +
+  "free tier) and set DATABASE_URL and DATABASE_AUTH_TOKEN in your host's " +
+  "environment variables, then redeploy.";
+
 function resolveUrl(): string {
-  const url = process.env.DATABASE_URL?.trim() || DEFAULT_FILE;
+  const configured = process.env.DATABASE_URL?.trim();
+  const url = configured || DEFAULT_FILE;
   if (isRemote(url)) return url;
+
   if (url.startsWith("file:")) {
+    // A file database on a serverless host cannot work, and failing here with
+    // an explanation beats an ENOENT from deep inside a mkdir.
+    if (isServerless()) {
+      throw new ConfigError(
+        configured
+          ? `DATABASE_URL is set to "${configured}", but a file database cannot be used here. ${SERVERLESS_HELP}`
+          : SERVERLESS_HELP,
+      );
+    }
+
     // Make the path absolute so it does not move around with the cwd, and make
     // sure the directory exists before libSQL tries to open the file.
     const rel = url.slice("file:".length);
     const abs = path.isAbsolute(rel) ? rel : path.join(process.cwd(), rel);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    try {
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+    } catch (err) {
+      throw new ConfigError(
+        `Could not create the database directory at ${path.dirname(abs)} ` +
+          `(${err instanceof Error ? err.message : String(err)}). Point DATABASE_URL ` +
+          `at a writable location, or use a hosted libSQL database.`,
+      );
+    }
     return `file:${abs}`;
   }
-  return url;
+
+  throw new ConfigError(
+    `DATABASE_URL is set to "${url}", which is not a supported database URL. ` +
+      `Use file:./data/journal.db for a local file, or libsql://… for a hosted database.`,
+  );
+}
+
+/** Whether the database is reachable — used to show a setup page instead of a form. */
+export async function databaseStatus(): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await db();
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ConfigError) return { ok: false, message: err.message };
+    return {
+      ok: false,
+      message:
+        err instanceof Error
+          ? `The database could not be reached: ${err.message}`
+          : "The database could not be reached.",
+    };
+  }
 }
 
 /** True for a hosted database reached over the network rather than a local file. */
