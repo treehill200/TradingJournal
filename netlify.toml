@@ -1,0 +1,13 @@
+# Netlify needs to be told this is a Next.js server app, not a static site.
+# Without the runtime plugin it publishes a directory with no index.html and
+# every route answers with Netlify's own "Page not found".
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

@@ -1,4 +1,4 @@
-import { createClient, type Client, type InValue } from "@libsql/client";
+import type { Client, InValue } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -6,9 +6,15 @@ import path from "node:path";
  * The journal runs on SQLite through libSQL.
  *
  *  - Local / self-hosted:  DATABASE_URL=file:./data/journal.db  (a real file on disk)
- *  - Serverless (Vercel):  DATABASE_URL=libsql://<db>.turso.io + DATABASE_AUTH_TOKEN
+ *  - Serverless:           DATABASE_URL=libsql://<db>.turso.io + DATABASE_AUTH_TOKEN
  *
  * Both speak the exact same SQL, so nothing else in the app has to care.
+ *
+ * The two are loaded through different entrypoints on purpose. The default
+ * @libsql/client pulls in a native binary, which serverless bundlers on
+ * Netlify and Vercel routinely fail to package. @libsql/client/web is pure
+ * HTTP with no native dependency, so a remote database never loads the binary
+ * at all — and a file: URL, which the web client cannot open, never reaches it.
  */
 
 const DEFAULT_FILE = "file:./data/journal.db";
@@ -18,6 +24,7 @@ let migrated: Promise<void> | null = null;
 
 function resolveUrl(): string {
   const url = process.env.DATABASE_URL?.trim() || DEFAULT_FILE;
+  if (isRemote(url)) return url;
   if (url.startsWith("file:")) {
     // Make the path absolute so it does not move around with the cwd, and make
     // sure the directory exists before libSQL tries to open the file.
@@ -29,12 +36,23 @@ function resolveUrl(): string {
   return url;
 }
 
-function getClient(): Client {
-  if (!client) {
-    client = createClient({
-      url: resolveUrl(),
-      authToken: process.env.DATABASE_AUTH_TOKEN,
-    });
+/** True for a hosted database reached over the network rather than a local file. */
+function isRemote(url: string): boolean {
+  return /^(libsql|wss?|https?):/i.test(url);
+}
+
+async function getClient(): Promise<Client> {
+  if (client) return client;
+
+  const url = resolveUrl();
+  const authToken = process.env.DATABASE_AUTH_TOKEN;
+
+  if (isRemote(url)) {
+    const { createClient } = await import("@libsql/client/web");
+    client = createClient({ url, authToken });
+  } else {
+    const { createClient } = await import("@libsql/client");
+    client = createClient({ url, authToken });
   }
   return client;
 }
@@ -196,7 +214,7 @@ async function migrate(c: Client): Promise<void> {
 
 /** Returns a ready-to-use client, running migrations exactly once per process. */
 export async function db(): Promise<Client> {
-  const c = getClient();
+  const c = await getClient();
   if (!migrated) {
     migrated = migrate(c).catch((err) => {
       migrated = null;

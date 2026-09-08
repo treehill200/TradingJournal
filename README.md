@@ -145,17 +145,55 @@ docker build -t trading-journal .
 docker run -p 3000:3000 -v trading-journal-data:/data trading-journal
 ```
 
-### Serverless (Vercel, Netlify)
+### Netlify
 
-Serverless filesystems are not persistent, so use a hosted libSQL database
-([Turso](https://turso.tech) has a free tier). Create a database, then set:
+Two things have to be right, and the first one is what produces Netlify's
+**"Page not found"**.
+
+**1. Netlify must treat this as a Next.js app, not a static site.** Every page
+here is server-rendered, so the build produces no `out/` directory of HTML. If
+Netlify publishes a folder with no `index.html`, every route answers with its
+own 404 page. The included `netlify.toml` fixes this:
+
+```toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+```
+
+If the site was created before that file existed, Netlify may still be using
+the settings it guessed at the time. Check **Site configuration → Build &
+deploy → Build settings** and make sure the build command is `npm run build`,
+the publish directory is `.next`, and the base directory is empty. Then
+redeploy with **Clear cache and deploy site** — a cached static build will keep
+serving 404s otherwise.
+
+**2. Netlify cannot store the database on disk.** Functions get a read-only,
+ephemeral filesystem, so `DATABASE_URL=file:...` cannot work there — the
+default would fail on the first write. Use a hosted libSQL database
+([Turso](https://turso.tech) has a free tier). Create one, then set under
+**Site configuration → Environment variables**:
 
 ```
 DATABASE_URL=libsql://your-database-name.turso.io
 DATABASE_AUTH_TOKEN=your-token
 ```
 
-Nothing else changes — the schema is created on first request either way.
+The schema is created on the first request, so there is no migration step.
+
+A remote `DATABASE_URL` is served through libSQL's pure-HTTP client, which has
+no native dependency — the native binary the default client would load is a
+common cause of serverless bundling failures, so it is never loaded unless the
+URL is a local file.
+
+### Vercel
+
+The same as Netlify's second point: set `DATABASE_URL` and
+`DATABASE_AUTH_TOKEN` to a Turso database. Vercel detects Next.js on its own,
+so no extra configuration is needed.
 
 ### Environment variables
 
